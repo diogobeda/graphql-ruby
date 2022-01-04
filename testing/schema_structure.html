@@ -6,7 +6,7 @@
     
       <title>GraphQL - Schema Structure</title>
     
-    <link href="https://fonts.googleapis.com/css?family=Rubik:300,400" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Rubik:300,400,700" rel="stylesheet" />
     <link rel="stylesheet" href="/css/main.css">
     <link rel="icon" href="/graphql-ruby-icon.png">
   </head>
@@ -19,7 +19,7 @@
           </a>
           <a href="/getting_started">Get Started</a>
           <a href="/guides">Guides</a>
-          <a href="/api-doc/1.9.6/">API</a>
+          <a href="/api-doc/1.13.2/">API</a>
           <a href="https://tinyletter.com/graphql-ruby">Newsletter</a>
           <a href="https://github.com/rmosolgo/graphql-ruby">Source Code</a>
           <a href="https://graphql.pro">Upgrade to Pro</a>
@@ -45,12 +45,13 @@
 </p>
 
 
+
 <h1 class="guide-header">Schema Structure</h1>
 <div class="guide-container">
   <p>Structural changes to a GraphQL schema come in two categories:</p>
 
 <ul>
-  <li><strong>Breaking</strong> changes may cause previously-valid queries to become invalid. For example, if you remove the <code class="highlighter-rouge">title</code> field, anyone who tries to query that field will get a validation error instead of response data.</li>
+  <li><strong>Breaking</strong> changes may cause previously-valid queries to become invalid. For example, if you remove the <code class="language-plaintext highlighter-rouge">title</code> field, anyone who tries to query that field will get a validation error instead of response data.</li>
   <li><strong>Non-breaking</strong> changes <em>add</em> options to a schema without breaking previously-valid queries.</li>
 </ul>
 
@@ -58,15 +59,57 @@
 
 <p>Here are few tips for managing schema structure changes.</p>
 
-<h2 id="maintain-a-graphql-schema-dump">Maintain a <code class="highlighter-rouge">.graphql</code> schema dump</h2>
+<h2 id="maintain-a-graphql-schema-dump">Maintain a <code class="language-plaintext highlighter-rouge">.graphql</code> schema dump</h2>
 
-<p>Make structure changes part of the normal code review process by adding a <code class="highlighter-rouge">schema.graphql</code> artifact to your project. This way, any changes to schema structure will show up clearly in a pull request as a diff to that file.</p>
+<p>Make structure changes part of the normal code review process by adding a <code class="language-plaintext highlighter-rouge">schema.graphql</code> artifact to your project. This way, any changes to schema structure will show up clearly in a pull request as a diff to that file.</p>
 
-<p>You can read about this approach in <a href="https://rmosolgo.github.io/blog/2017/03/16/tracking-schema-changes-with-graphql-ruby/">“Tracking Schema Changes with GraphQL-Ruby”</a> or the built-in <a href="/api-doc/1.9.6/GraphQL/RakeTask" target="_blank" title="API docs for GraphQL::RakeTask"><code>GraphQL::RakeTask</code></a> for generating schema dumps.</p>
+<p>You can read about this approach in <a href="https://rmosolgo.github.io/ruby/graphql/2017/03/16/tracking-schema-changes-with-graphql-ruby">“Tracking Schema Changes with GraphQL-Ruby”</a> or the built-in <a href="/api-doc/1.13.2/GraphQL/RakeTask" target="_blank" title="API docs for GraphQL::RakeTask"><code>GraphQL::RakeTask</code></a> for generating schema dumps.</p>
 
 <h2 id="automatically-check-for-breaking-changes">Automatically check for breaking changes</h2>
 
-<p>You can use <a href="https://github.com/xuorig/graphql-schema_comparator">GraphQL::SchemaComparator</a> to check for breaking changes during development or CI.</p>
+<p>You can use <a href="https://github.com/xuorig/graphql-schema_comparator">GraphQL::SchemaComparator</a> to check for breaking changes during development or CI. If you maintain a dump of queries that typically run against your server, you may also utilize <code class="language-plaintext highlighter-rouge">GraphQL::StaticValidation</code> to validate these queries directly. A Rake task such as the one below can be used to identify changes that are incompatible with existing queries.</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">namespace</span> <span class="ss">:graphql</span> <span class="k">do</span>
+  <span class="n">namespace</span> <span class="ss">:queries</span> <span class="k">do</span>
+    <span class="n">desc</span> <span class="s1">'Validates GraphQL queries against the current schema'</span>
+    <span class="n">task</span> <span class="ss">validate: </span><span class="p">[</span><span class="ss">:environment</span><span class="p">]</span> <span class="k">do</span>
+      <span class="n">queries_file</span> <span class="o">=</span> <span class="s1">'test/fixtures/files/queries.json'</span>
+      <span class="n">queries</span> <span class="o">=</span> <span class="no">Oj</span><span class="p">.</span><span class="nf">load</span><span class="p">(</span><span class="no">File</span><span class="p">.</span><span class="nf">read</span><span class="p">(</span><span class="n">queries_file</span><span class="p">))</span>
+
+      <span class="no">Validate</span><span class="p">.</span><span class="nf">run_validate</span><span class="p">(</span><span class="n">queries</span><span class="p">,</span> <span class="no">MySchema</span><span class="p">)</span>
+    <span class="k">end</span>
+
+    <span class="k">module</span> <span class="nn">Validate</span>
+      <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">run_validate</span><span class="p">(</span><span class="n">queries</span><span class="p">,</span> <span class="n">schema</span><span class="p">)</span>
+        <span class="nb">puts</span> <span class="s1">'⏳  Validating queries...'</span>
+        <span class="nb">puts</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
+
+        <span class="n">results</span> <span class="o">=</span> <span class="n">queries</span><span class="p">.</span><span class="nf">map</span> <span class="p">{</span> <span class="o">|</span><span class="n">query</span><span class="o">|</span> <span class="n">schema</span><span class="p">.</span><span class="nf">validate</span><span class="p">(</span><span class="n">query</span><span class="p">)</span> <span class="p">}</span>
+        <span class="n">errors</span> <span class="o">=</span> <span class="n">results</span>
+                   <span class="p">.</span><span class="nf">select</span> <span class="p">{</span> <span class="o">|</span><span class="n">result</span><span class="o">|</span> <span class="n">result</span><span class="p">[</span><span class="ss">:errors</span><span class="p">].</span><span class="nf">present?</span> <span class="p">}</span>
+                   <span class="p">.</span><span class="nf">map</span> <span class="p">{</span> <span class="o">|</span><span class="n">result</span><span class="o">|</span> <span class="n">result</span><span class="p">[</span><span class="ss">:errors</span><span class="p">]</span> <span class="p">}</span>
+                   <span class="p">.</span><span class="nf">flatten</span>
+
+        <span class="k">if</span> <span class="n">errors</span><span class="p">.</span><span class="nf">empty?</span>
+          <span class="nb">puts</span> <span class="s1">'✅  All queries are valid'</span>
+        <span class="k">else</span>
+          <span class="n">print_errors</span><span class="p">(</span><span class="n">errors</span><span class="p">)</span>
+        <span class="k">end</span>
+      <span class="k">end</span>
+
+      <span class="k">def</span> <span class="nc">self</span><span class="o">.</span><span class="nf">print_errors</span><span class="p">(</span><span class="n">errors</span><span class="p">)</span>
+        <span class="nb">puts</span> <span class="s1">'Detected the following errors:'</span>
+        <span class="nb">puts</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
+
+        <span class="n">errors</span><span class="p">.</span><span class="nf">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">error</span><span class="o">|</span>
+          <span class="n">path</span> <span class="o">=</span> <span class="n">error</span><span class="p">.</span><span class="nf">path</span><span class="p">.</span><span class="nf">join</span><span class="p">(</span><span class="s1">', '</span><span class="p">)</span>
+          <span class="nb">puts</span> <span class="s2">"❌  </span><span class="si">#{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">#{</span><span class="n">error</span><span class="p">.</span><span class="nf">message</span><span class="si">}</span><span class="s2">"</span>
+        <span class="k">end</span>
+      <span class="k">end</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+</code></pre></div></div>
 
 </div>
 <p class="guide-footer">

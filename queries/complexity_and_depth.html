@@ -6,7 +6,7 @@
     
       <title>GraphQL - Complexity & Depth</title>
     
-    <link href="https://fonts.googleapis.com/css?family=Rubik:300,400" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Rubik:300,400,700" rel="stylesheet" />
     <link rel="stylesheet" href="/css/main.css">
     <link rel="icon" href="/graphql-ruby-icon.png">
   </head>
@@ -19,7 +19,7 @@
           </a>
           <a href="/getting_started">Get Started</a>
           <a href="/guides">Guides</a>
-          <a href="/api-doc/1.9.6/">API</a>
+          <a href="/api-doc/1.13.2/">API</a>
           <a href="https://tinyletter.com/graphql-ruby">Newsletter</a>
           <a href="https://github.com/rmosolgo/graphql-ruby">Source Code</a>
           <a href="https://graphql.pro">Upgrade to Pro</a>
@@ -45,11 +45,14 @@
 </p>
 
 
+
 <h1 class="guide-header">Complexity & Depth</h1>
 <div class="guide-container">
-  <h2 id="prevent-complex-queries">Prevent complex queries</h2>
+  <p>GraphQL-Ruby ships with some validations based on <a href="/queries/ast_analysis">query analysis</a>. You can customize them as-needed, too.</p>
 
-<p>Fields have a “complexity” value which can be configured in their definition. It can be a constant (numeric) value, or a proc. If no <code class="highlighter-rouge">complexity</code> is defined for a field, it will default to a value of <code class="highlighter-rouge">1</code>. It can be defined as a keyword <em>or</em> inside the configuration block. For example:</p>
+<h2 id="prevent-complex-queries">Prevent complex queries</h2>
+
+<p>Fields have a “complexity” value which can be configured in their definition. It can be a constant (numeric) value, or a proc. If no <code class="language-plaintext highlighter-rouge">complexity</code> is defined for a field, it will default to a value of <code class="language-plaintext highlighter-rouge">1</code>. It can be defined as a keyword <em>or</em> inside the configuration block. For example:</p>
 
 <div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Constant complexity:</span>
 <span class="n">field</span> <span class="ss">:top_score</span><span class="p">,</span> <span class="no">Integer</span><span class="p">,</span> <span class="ss">null: </span><span class="kp">false</span><span class="p">,</span> <span class="ss">complexity: </span><span class="mi">10</span>
@@ -74,11 +77,11 @@
 <span class="k">end</span>
 </code></pre></div></div>
 
-<p>Then, define your <code class="highlighter-rouge">max_complexity</code> at the schema-level:</p>
+<p>Then, define your <code class="language-plaintext highlighter-rouge">max_complexity</code> at the schema-level:</p>
 
 <div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">MySchema</span> <span class="o">&lt;</span> <span class="no">GraphQL</span><span class="o">::</span><span class="no">Schema</span>
- <span class="c1"># ...</span>
- <span class="n">max_complexity</span> <span class="mi">100</span>
+  <span class="c1"># ...</span>
+  <span class="n">max_complexity</span> <span class="mi">100</span>
 <span class="k">end</span>
 </code></pre></div></div>
 
@@ -87,24 +90,77 @@
 <div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">MySchema</span><span class="p">.</span><span class="nf">execute</span><span class="p">(</span><span class="n">query_string</span><span class="p">,</span> <span class="ss">max_complexity: </span><span class="mi">100</span><span class="p">)</span>
 </code></pre></div></div>
 
-<p>Using <code class="highlighter-rouge">nil</code> will disable the validation:</p>
+<p>Using <code class="language-plaintext highlighter-rouge">nil</code> will disable the validation:</p>
 
 <div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># 😧 Anything goes!</span>
 <span class="no">MySchema</span><span class="p">.</span><span class="nf">execute</span><span class="p">(</span><span class="n">query_string</span><span class="p">,</span> <span class="ss">max_complexity: </span><span class="kp">nil</span><span class="p">)</span>
 </code></pre></div></div>
 
-<p>To get a feeling for complexity of queries in your system, you can use the <code class="highlighter-rouge">QueryComplexity</code> query reducer. Hook it up to log out values from each query:</p>
+<p>To get a feeling for complexity of queries in your system, you can extend <a href="/api-doc/1.13.2/GraphQL/Analysis/AST/QueryComplexity" target="_blank" title="API docs for GraphQL::Analysis::AST::QueryComplexity"><code>GraphQL::Analysis::AST::QueryComplexity</code></a>. Hook it up to log out values from each query:</p>
 
-<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">LogQueryComplexityAnalyzer</span> <span class="o">&lt;</span> <span class="no">GraphQL</span><span class="o">::</span><span class="no">Analysis</span><span class="o">::</span><span class="no">AST</span><span class="o">::</span><span class="no">QueryComplexity</span>
+  <span class="c1"># Override this method to _do something_ with the calculated complexity value</span>
+  <span class="k">def</span> <span class="nf">result</span>
+    <span class="n">complexity</span> <span class="o">=</span> <span class="k">super</span>
+    <span class="n">message</span> <span class="o">=</span> <span class="s2">"[GraphQL Query Complexity] </span><span class="si">#{</span><span class="n">complexity</span><span class="si">}</span><span class="s2"> | staff? </span><span class="si">#{</span><span class="n">query</span><span class="p">.</span><span class="nf">context</span><span class="p">[</span><span class="ss">:current_user</span><span class="p">].</span><span class="nf">staff?</span><span class="si">}</span><span class="s2">"</span>
+    <span class="no">Rails</span><span class="p">.</span><span class="nf">logger</span><span class="p">.</span><span class="nf">info</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+
 <span class="k">class</span> <span class="nc">MySchema</span> <span class="o">&lt;</span> <span class="no">GraphQL</span><span class="o">::</span><span class="no">Schema</span>
-  <span class="n">log_query_complexity</span> <span class="o">=</span> <span class="no">GraphQL</span><span class="o">::</span><span class="no">Analysis</span><span class="o">::</span><span class="no">QueryComplexity</span><span class="p">.</span><span class="nf">new</span> <span class="p">{</span> <span class="o">|</span><span class="n">query</span><span class="p">,</span> <span class="n">complexity</span><span class="o">|</span> <span class="no">Rails</span><span class="p">.</span><span class="nf">logger</span><span class="p">.</span><span class="nf">info</span><span class="p">(</span><span class="s2">"[GraphQL Query Complexity] </span><span class="si">#{</span><span class="n">complexity</span><span class="si">}</span><span class="s2">  | staff? </span><span class="si">#{</span><span class="n">query</span><span class="p">.</span><span class="nf">context</span><span class="p">[</span><span class="ss">:current_user</span><span class="p">].</span><span class="nf">staff?</span><span class="si">}</span><span class="s2">"</span><span class="p">)}</span>
-  <span class="n">query_analyzer</span><span class="p">(</span><span class="n">log_query_complexity</span><span class="p">)</span>
+  <span class="n">query_analyzer</span><span class="p">(</span><span class="no">LogQueryComplexityAnalyzer</span><span class="p">)</span>
+<span class="k">end</span>
+</code></pre></div></div>
+
+<h4 id="connection-fields">Connection fields</h4>
+
+<p>By default, GraphQL-Ruby calculates a complexity value for connection fields by:</p>
+
+<ul>
+  <li>adding <code class="language-plaintext highlighter-rouge">1</code> for <code class="language-plaintext highlighter-rouge">pageInfo</code> and each of its subselections</li>
+  <li>adding <code class="language-plaintext highlighter-rouge">1</code> for <code class="language-plaintext highlighter-rouge">count</code>, <code class="language-plaintext highlighter-rouge">totalCount</code>, or <code class="language-plaintext highlighter-rouge">total</code></li>
+  <li>adding <code class="language-plaintext highlighter-rouge">1</code> for the connection field itself</li>
+  <li>
+    <p>multiplying the complexity of other fields by the largest possible page size, which is the greater of <code class="language-plaintext highlighter-rouge">first:</code> or <code class="language-plaintext highlighter-rouge">last:</code>, or if neither of those is given, the field’s <code class="language-plaintext highlighter-rouge">max_page_size</code> or the schema’s <code class="language-plaintext highlighter-rouge">default_max_page_size</code>.</p>
+
+    <p>(If no max page size can be determined, then the analysis crashes with an internal error – set <code class="language-plaintext highlighter-rouge">default_max_page_size</code> in your schema to prevent this.)</p>
+  </li>
+</ul>
+
+<p>For example, this query has complexity <code class="language-plaintext highlighter-rouge">26</code>:</p>
+
+<div class="language-graphql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">query</span><span class="w"> </span><span class="p">{</span><span class="w">
+  </span><span class="n">author</span><span class="w"> </span><span class="p">{</span><span class="w">              </span><span class="c"># +1</span><span class="w">
+    </span><span class="n">name</span><span class="w">                </span><span class="c"># +1</span><span class="w">
+    </span><span class="n">books</span><span class="p">(</span><span class="n">first</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">  </span><span class="c"># +1</span><span class="w">
+      </span><span class="n">nodes</span><span class="w"> </span><span class="p">{</span><span class="w">           </span><span class="c"># +10 (+1, multiplied by `first:` above)</span><span class="w">
+        </span><span class="n">title</span><span class="w">           </span><span class="c"># +10 (ditto)</span><span class="w">
+      </span><span class="p">}</span><span class="w">
+      </span><span class="n">pageInfo</span><span class="w"> </span><span class="p">{</span><span class="w">        </span><span class="c"># +1</span><span class="w">
+        </span><span class="n">endCursor</span><span class="w">       </span><span class="c"># +1</span><span class="w">
+      </span><span class="p">}</span><span class="w">
+      </span><span class="n">totalCount</span><span class="w">        </span><span class="c"># +1</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>To customize this behavior, implement <code class="language-plaintext highlighter-rouge">def calculate_complexity?(query:, nodes:, child_complexity:)</code> in your base field class, handling the case where <code class="language-plaintext highlighter-rouge">self.connection?</code> is <code class="language-plaintext highlighter-rouge">true</code>:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">Types::BaseField</span> <span class="o">&lt;</span> <span class="no">GraphQL</span><span class="o">::</span><span class="no">Schema</span><span class="o">::</span><span class="no">Field</span>
+  <span class="k">def</span> <span class="nf">calculate_complexity</span><span class="p">(</span><span class="n">query</span><span class="p">:,</span> <span class="n">nodes</span><span class="p">:,</span> <span class="n">child_complexity</span><span class="p">:)</span>
+    <span class="k">if</span> <span class="n">connection?</span>
+      <span class="c1"># Custom connection calculation goes here</span>
+    <span class="k">else</span>
+      <span class="k">super</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
 <span class="k">end</span>
 </code></pre></div></div>
 
 <h2 id="prevent-deeply-nested-queries">Prevent deeply-nested queries</h2>
 
-<p>You can also reject queries based on the depth of their nesting. You can define <code class="highlighter-rouge">max_depth</code> at schema-level or query-level:</p>
+<p>You can also reject queries based on the depth of their nesting. You can define <code class="language-plaintext highlighter-rouge">max_depth</code> at schema-level or query-level:</p>
 
 <div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Schema-level:</span>
 <span class="k">class</span> <span class="nc">MySchema</span> <span class="o">&lt;</span> <span class="no">GraphQL</span><span class="o">::</span><span class="no">Schema</span>
@@ -116,17 +172,24 @@
 <span class="no">MySchema</span><span class="p">.</span><span class="nf">execute</span><span class="p">(</span><span class="n">query_string</span><span class="p">,</span> <span class="ss">max_depth: </span><span class="mi">10</span><span class="p">)</span>
 </code></pre></div></div>
 
-<p>You can use <code class="highlighter-rouge">nil</code> to disable the validation:</p>
+<p>You can use <code class="language-plaintext highlighter-rouge">nil</code> to disable the validation:</p>
 
 <div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># This query won't be validated:</span>
 <span class="no">MySchema</span><span class="p">.</span><span class="nf">execute</span><span class="p">(</span><span class="n">query_string</span><span class="p">,</span> <span class="ss">max_depth: </span><span class="kp">nil</span><span class="p">)</span>
 </code></pre></div></div>
 
-<p>To get a feeling for depth of queries in your system, you can use the <code class="highlighter-rouge">QueryDepth</code> query reducer. Hook it up to log out values from each query:</p>
+<p>To get a feeling for depth of queries in your system, you can extend <a href="/api-doc/1.13.2/GraphQL/Analysis/AST/QueryDepth" target="_blank" title="API docs for GraphQL::Analysis::AST::QueryDepth"><code>GraphQL::Analysis::AST::QueryDepth</code></a>. Hook it up to log out values from each query:</p>
 
-<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">MySchema</span> <span class="o">&lt;</span> <span class="no">GraphQL</span><span class="o">::</span><span class="no">Schema</span>
-  <span class="n">log_query_depth</span> <span class="o">=</span> <span class="no">GraphQL</span><span class="o">::</span><span class="no">Analysis</span><span class="o">::</span><span class="no">QueryDepth</span><span class="p">.</span><span class="nf">new</span> <span class="p">{</span> <span class="o">|</span><span class="n">query</span><span class="p">,</span> <span class="n">depth</span><span class="o">|</span> <span class="no">Rails</span><span class="p">.</span><span class="nf">logger</span><span class="p">.</span><span class="nf">info</span><span class="p">(</span><span class="s2">"[GraphQL Query Depth] </span><span class="si">#{</span><span class="n">depth</span><span class="si">}</span><span class="s2"> || staff?  </span><span class="si">#{</span><span class="n">query</span><span class="p">.</span><span class="nf">context</span><span class="p">[</span><span class="ss">:current_user</span><span class="p">].</span><span class="nf">staff?</span><span class="si">}</span><span class="s2">"</span><span class="p">)}</span>
-  <span class="n">query_analyzer</span><span class="p">(</span><span class="n">log_query_depth</span><span class="p">)</span>
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">LogQueryDepth</span> <span class="o">&lt;</span> <span class="no">GraphQL</span><span class="o">::</span><span class="no">Analysis</span><span class="o">::</span><span class="no">AST</span><span class="o">::</span><span class="no">QueryDepth</span>
+  <span class="k">def</span> <span class="nf">result</span>
+    <span class="n">query_depth</span> <span class="o">=</span> <span class="k">super</span>
+    <span class="n">message</span> <span class="o">=</span> <span class="s2">"[GraphQL Query Depth] </span><span class="si">#{</span><span class="n">query_depth</span><span class="si">}</span><span class="s2"> || staff?  </span><span class="si">#{</span><span class="n">query</span><span class="p">.</span><span class="nf">context</span><span class="p">[</span><span class="ss">:current_user</span><span class="p">].</span><span class="nf">staff?</span><span class="si">}</span><span class="s2">"</span>
+    <span class="no">Rails</span><span class="p">.</span><span class="nf">logger</span><span class="p">.</span><span class="nf">info</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+
+<span class="k">class</span> <span class="nc">MySchema</span> <span class="o">&lt;</span> <span class="no">GraphQL</span><span class="o">::</span><span class="no">Schema</span>
+  <span class="n">query_analyzer</span><span class="p">(</span><span class="no">LogQueryDepth</span><span class="p">)</span>
 <span class="k">end</span>
 </code></pre></div></div>
 
